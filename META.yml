@@ -28,4 +28,4 @@ requires:
   YAML: '0.9'
 resources:
   repository: http://github.com/mschilli/oauth-cmdline.git
-version: '0.01'
+version: '0.02'

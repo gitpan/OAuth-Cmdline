@@ -3,7 +3,6 @@ package OAuth::Cmdline;
 ###########################################
 use strict;
 use warnings;
-use Moo;
 use URI;
 use YAML qw( DumpFile LoadFile );
 use HTTP::Request::Common;
@@ -11,8 +10,9 @@ use LWP::UserAgent;
 use Log::Log4perl qw(:easy);
 use JSON qw( from_json );
 use MIME::Base64;
+use Moo;
 
-our $VERSION = "0.01";
+our $VERSION = "0.02";
 
 has client_id     => ( is => "ro" );
 has client_secret => ( is => "ro" );
@@ -71,7 +71,7 @@ sub access_token {
     my( $self ) = @_;
 
     if( $self->token_expired() ) {
-        $self->token_refresh();
+        $self->token_refresh() or LOGDIE "Token refresh failed";
     }
 
     my $cache = $self->cache_read();
@@ -90,6 +90,14 @@ sub authorization_headers {
 }
 
 ###########################################
+sub token_refresh_authorization_header {
+###########################################
+    my( $self ) = @_;
+
+    return ();
+}
+
+###########################################
 sub token_refresh {
 ###########################################
     my( $self ) = @_;
@@ -100,20 +108,15 @@ sub token_refresh {
 
     $self->token_uri( $cache->{ token_uri } );
 
-    my $auth_header = 
-        "Basic " . 
-        encode_base64( 
-            "$cache->{ client_id }:$cache->{ client_secret }", 
-            "" # no line break!!
-        );
-
     my $req = &HTTP::Request::Common::POST(
         $self->token_uri,
         {
             refresh_token => $cache->{ refresh_token },
+            client_id     => $cache->{ client_id },
+            client_secret => $cache->{ client_secret },
             grant_type    => 'refresh_token',
         },
-        Authorization => $auth_header,
+        $self->token_refresh_authorization_header(),
     );
 
     my $ua = LWP::UserAgent->new();
@@ -243,7 +246,10 @@ OAuth::Cmdline - OAuth2 for command line applications using web services
 
 =head1 SYNOPSIS
 
-    my $oauth = OAuth::Cmdline->new( site => "spotify" );
+      # Use a site-specific class instead of the parent class, see
+      # description below for generic cases
+
+    my $oauth = OAuth::Cmdline::GoogleDrive->new( );
     $oauth->access_token();
 
 =head1 DESCRIPTION
@@ -254,10 +260,24 @@ web services requiring OAuth access tokens.
 =head1 WARNING: LIMITED ALPHA RELEASE
 
 While C<OAuth::Cmdline> has been envisioned to work with 
-various OAuth-controlled web services, it currently only works with 
-Spotify. But stay tuned, I'll refactor the site-specific parts of the
-code soon, so that it'll work with Google Drive, Evernote and others as 
+various OAuth-controlled web services, it currently only works with the
+Google Drive API and Spotify. 
+But stay tuned, I'll refactor the site-specific parts of the
+code soon, so that it'll work with Evernote, Tumblr and others as 
 well. Hey, or send me a pull request if you want to beat me to it! :)
+So far the following subclasses are available:
+
+    OAuth::Cmdline::GoogleDrive
+    OAuth::Cmdline::Spotify
+
+If you want to use this module for a different service, go ahead and try
+it, it might just as well work. In this case, specify the C<site> parameter,
+which determines the name of the cache file with the access token and
+other settings in your home directory:
+
+      # Will use standard OAuth techniques and save your
+      # tokens in ~/.some-other.site.yml
+    my $oauth = OAuth::Cmdline->new( site => "some-other-site" );
 
 =head1 GETTING STARTED
 
@@ -271,12 +291,11 @@ Then, run the following script (the example uses the Spotify web service)
     use OAuth::Cmdline;
     use OAuth::Cmdline::Mojo;
 
-    my $oauth = OAuth::Cmdline->new(
+    my $oauth = OAuth::Cmdline::GoogleDrive->new(
         client_id     => "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
         client_secret => "YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY",
         login_uri     => "https://accounts.spotify.com/authorize",
         token_uri     => "https://accounts.spotify.com/api/token",
-        site          => "spotify",
         scope         => "user-read-private",
     );
     
