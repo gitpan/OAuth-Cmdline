@@ -12,7 +12,7 @@ use JSON qw( from_json );
 use MIME::Base64;
 use Moo;
 
-our $VERSION = "0.03";
+our $VERSION = "0.04";
 
 has client_id     => ( is => "ro" );
 has client_secret => ( is => "ro" );
@@ -24,11 +24,12 @@ has homedir => (
   is      => "ro",
   default => glob '~',
 );
-has login_uri => ( is => "rw" );
-has site      => ( is => "rw" );
-has scope     => ( is => "rw" );
-has token_uri => ( is => "rw" );
-has redir_uri => ( is => "rw" );
+has login_uri   => ( is => "rw" );
+has site        => ( is => "rw" );
+has scope       => ( is => "rw" );
+has token_uri   => ( is => "rw" );
+has redir_uri   => ( is => "rw" );
+has access_type => ( is => "rw" );
 
 ###########################################
 sub redirect_uri {
@@ -60,6 +61,8 @@ sub full_login_uri {
       response_type => "code",
       redirect_uri  => $self->redirect_uri(),
       scope         => $self->scope(),
+      ($self->access_type() ?
+          (access_type => $self->access_type()) : ()),
     );
 
     return $full_login_uri;
@@ -191,8 +194,12 @@ sub cache_write {
 ###########################################
     my( $self, $cache ) = @_;
 
-    umask 0177;
-    return DumpFile $self->cache_file_path, $cache;
+    my $old_umask = umask 0177;
+
+    DumpFile $self->cache_file_path, $cache;
+
+    umask $old_umask;
+    return 1;
 }
 
 ###########################################
